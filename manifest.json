@@ -3,7 +3,7 @@
   "type": "integration",
   "name": "Netatmo Camera",
   "version": "0.1.0",
-  "description": "Netatmo Security cameras (Presence) — snapshot, live view, monitoring, spot light, siren, detections",
+  "description": "Netatmo Security cameras (Presence) — snapshot, live view, monitoring, spot light, detections",
   "icon": "Camera",
   "repo": "alpitux/sowel-plugin-netatmo-camera",
   "author": "alpitux",

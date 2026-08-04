@@ -15,7 +15,6 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { isSupportedCameraType, capabilitiesFor } from "./capability-map.js";
 import { newEvents, type NetatmoEvent } from "./event-dedup.js";
-import { scheduleSirenRevert } from "./siren-timer.js";
 
 // ============================================================
 // Local type definitions (mirrors src/shared/plugin-api.ts + related)
@@ -313,16 +312,35 @@ class NetatmoBridge {
     return res.body?.home?.events ?? [];
   }
 
-  /** Resolve the camera's LAN-local base URL via its vpn_url, when the
-   * plugin (running on the Sowel host) is on the same network as the
-   * camera. Falls back to null (caller uses vpn_url) on any failure —
-   * this is a best-effort optimization, not a hard requirement. */
+  /** Resolve the camera's LAN-local base URL, when the plugin (running on
+   * the Sowel host) can actually reach it.
+   *
+   * Confirmed live (2026-08-04): `{vpn_url}/command/ping` returns whatever
+   * `local_url` the camera last reported to Netatmo's cloud — this is the
+   * camera's own belief about its LAN address, unconditionally, NOT a
+   * reachability check from the caller's position. On Romain's setup the
+   * dev VM and the camera are on different subnets with no route between
+   * them, so blindly trusting `local_url` produced an address the VM
+   * can't fetch at all (confirmed: even `curl` from the VM host times out
+   * against it, not just from inside the container).
+   *
+   * So this now verifies reachability with a second, direct ping against
+   * the candidate `local_url` itself before trusting it — falls back to
+   * `vpn_url` (always reachable, it's Netatmo's relay) on any failure,
+   * exactly as before. */
   async pingLocal(vpnUrl: string): Promise<string | null> {
+    const candidate = await this.pingOnce(`${vpnUrl}/command/ping`);
+    if (!candidate) return null;
+    const verified = await this.pingOnce(`${candidate}/command/ping`);
+    return verified ? candidate : null;
+  }
+
+  private async pingOnce(pingUrl: string): Promise<string | null> {
     try {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 2_000);
       try {
-        const res = await fetch(`${vpnUrl}/command/ping`, { signal: controller.signal });
+        const res = await fetch(pingUrl, { signal: controller.signal });
         if (!res.ok) return null;
         const data = (await res.json()) as { local_url?: string };
         return data.local_url ?? null;
@@ -457,7 +475,7 @@ class NetatmoBridge {
 class NetatmoCameraPlugin implements IntegrationPlugin {
   readonly id = INTEGRATION_ID;
   readonly name = "Netatmo Camera";
-  readonly description = "Netatmo Security cameras — snapshot, live view, monitoring, spot, siren, detections";
+  readonly description = "Netatmo Security cameras — snapshot, live view, monitoring, spot light, detections";
   readonly icon = "Camera";
   readonly apiVersion = 2;
 
@@ -611,17 +629,6 @@ class NetatmoCameraPlugin implements IntegrationPlugin {
       case "light_mode":
         await this.bridge.setState(this.homeId, moduleId, { floodlight: value });
         return;
-      case "siren": {
-        await this.bridge.setState(this.homeId, moduleId, { siren_status: "sound" });
-        scheduleSirenRevert(() => {
-          this.bridge
-            ?.setState(this.homeId, moduleId, { siren_status: "no_sound" })
-            .catch((err) =>
-              this.logger.warn({ err, moduleId } as Record<string, unknown>, "Siren auto-revert failed"),
-            );
-        });
-        return;
-      }
       default:
         throw new Error(`Unknown order: ${orderKey}`);
     }

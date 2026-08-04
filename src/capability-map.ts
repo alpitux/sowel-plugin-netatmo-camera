@@ -21,7 +21,13 @@ export function isSupportedCameraType(type: string): boolean {
 
 export function capabilitiesFor(type: string): CameraCapabilities {
   if (type === PRESENCE_TYPE) {
-    return { hasFloodlight: true, hasSiren: true };
+    // hasSiren confirmed FALSE live (2026-08-04): Netatmo's setstate
+    // rejects `siren_status` on Romain's real Presence with a 400 —
+    // "should NOT have additional properties ['siren_status']". Community
+    // references (pyatmo's SirenMixin) apply it to NOC generically, but
+    // that doesn't hold for this actual unit/firmware — trust the live
+    // API response over the library.
+    return { hasFloodlight: true, hasSiren: false };
   }
   return { hasFloodlight: false, hasSiren: false };
 }

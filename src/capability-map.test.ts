@@ -20,8 +20,8 @@ describe("isSupportedCameraType", () => {
 });
 
 describe("capabilitiesFor", () => {
-  it("gives the Presence floodlight + siren", () => {
-    expect(capabilitiesFor("NOC")).toEqual({ hasFloodlight: true, hasSiren: true });
+  it("gives the Presence floodlight, but not siren — confirmed live, Netatmo rejects siren_status with a 400 on Romain's unit", () => {
+    expect(capabilitiesFor("NOC")).toEqual({ hasFloodlight: true, hasSiren: false });
   });
 
   it("gives unsupported/unknown types neither", () => {
