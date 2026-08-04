@@ -5,10 +5,15 @@
 Romain owns two Netatmo Security cameras: a **Presence** (outdoor, model
 `NOC`) and an **Indoor Camera Advance** (indoor, model `NPC`, released late
 2024 — corrected 2026-08-04; earlier drafts of this spec assumed a Welcome
-`NACamera`, which he does not own). This plugin binds them into the
-`camera` equipment type introduced by `mchacher/sowel` spec 133 (core
-Sowel, already implemented on `alpitux/sowel:feat/camera-equipment-type`,
-not yet merged/tested live).
+`NACamera`, which he does not own). **v1 of this plugin targets the
+Presence only** — decided 2026-08-04 after live API testing showed the
+Advance is currently undiscoverable via the API (external Netatmo-side
+issue) and its live view needs WebRTC, which spec 133's proxy doesn't
+support yet. See "Live API test results" below for the full picture; the
+Advance is revisited in a later iteration, not blocking this one. This
+plugin binds into the `camera` equipment type introduced by
+`mchacher/sowel` spec 133 (core Sowel, already implemented on
+`alpitux/sowel:feat/camera-equipment-type`, not yet merged/tested live).
 
 This is the **first** camera plugin, validating spec 133's contract against
 a real vendor before Eufy/Foscam plugins are attempted. Auth reuses the
@@ -36,15 +41,15 @@ code blindly against.
 
 | Concern | Endpoint | Notes |
 |---|---|---|
-| OAuth token | `POST https://api.netatmo.com/oauth2/token` | Same server as `legrand_energy`. `grant_type=refresh_token`. |
-| Scopes | `read_camera`, `access_camera`, `read_presence`, `access_presence`, `write_presence` | To confirm exact set needed for monitoring toggle — `write_camera` may also be required (source split monitoring from Presence-specific writes). |
-| Discovery | `POST api/homesdata` | Returns `homes[].cameras[]`: `id`, `type` (`NACamera`=Welcome, `NOC`=Presence, `NDB`=Doorbell — not owned, out of scope), `name`, `vpn_url`, `is_local`. |
-| Live state | `POST api/homestatus` | Per-module current state: `monitoring`, `sd_status`, `alim_status`, and (Presence) `floodlight` mode. |
+| OAuth token | `POST https://api.netatmo.com/oauth2/token` | Same server as `legrand_energy`. `grant_type=refresh_token`. **Confirmed live** — refresh token rotates on every call, must persist the new one immediately (`onRefreshTokenUpdated`, same as `legrand_energy`). |
+| Scopes | `read_camera`, `write_camera`, `access_camera`, `read_presence`, `write_presence`, `access_presence` | **Confirmed live** (all 6 present on the token's granted scope list). |
+| Discovery | `POST api/homesdata` | **Confirmed live, shape corrected**: devices are a **flat `home.modules[]` array** with a `type` field (`NOC`=Presence, `NPC`=Indoor Camera Advance, `NDB`=Doorbell), same convention `legrand_energy` already parses — **not** a separate `home.cameras[]` array as older docs/libraries suggested. No `vpn_url`/live state here — that's `homestatus`-only. |
+| Live state | `POST api/homestatus` | **Confirmed live**: same flat `home.modules[]` shape, and for the Presence returns `monitoring`, `floodlight`, `siren_status`, `vpn_url`, `is_local`, `sd_status`, `alim_status` **all in one call** — no need to hit the camera directly just to read state. |
 | Local resolution | `GET {vpn_url}/command/ping` | Returns `{ local_url }` if the camera is reachable on the same LAN as wherever this poll runs (i.e. the Sowel dev VM). Prefer `local_url` over `vpn_url` when present — lower latency, no Netatmo relay bandwidth. |
 | Snapshot | `GET {local_url or vpn_url}/live/snapshot_720.jpg` | Feeds `camera_snapshot_url`. |
 | Live stream | `GET {local_url or vpn_url}/live/files/high/index.m3u8` | HLS, feeds `camera_stream_url`. Sourced from Home Assistant's integration (`quality` defaults to `"high"`); older references show a slightly different path (`/live/index.m3u8`) depending on firmware — **first thing to confirm live**. |
 | Monitoring on/off | `POST api/setstate` `{ modules: [{ id, monitoring: "on"\|"off" }] }` | Maps to `camera_monitoring` (data) + `set_camera_monitoring` (order). Whether a `home: { id, ... }` wrapper is also required (like floodlight/siren below) is to confirm. |
-| Presence floodlight | `POST api/setstate` `{ home: { id, modules: [{ id, floodlight: "on"\|"off"\|"auto" }] } }` | Maps to `camera_light_mode` (data) + `set_camera_light_mode` (order). **Presence (`NOC`) only** — Welcome doesn't expose this; the plugin simply doesn't emit these keys for a `NACamera` device (spec 133 polymorphism). |
+| Presence floodlight | `POST api/setstate` `{ home: { id, modules: [{ id, floodlight: "on"\|"off"\|"auto" }] } }` | Maps to `camera_light_mode` (data) + `set_camera_light_mode` (order). **Presence-specific hardware** — moot for v1 since the Presence is the only device type this plugin handles, but the plugin should still gate on `type === "NOC"` rather than assume, so it degrades cleanly if the Advance is added later (spec 133 polymorphism). |
 | Presence siren | `POST api/setstate` `{ home: { id, modules: [{ id, siren_status: "sound"\|"no_sound" }] } }` | Netatmo models the siren as a **state**, not a momentary pulse — but spec 133's `trigger_camera_siren` is a no-payload action. This plugin sends `"sound"`, then auto-reverts to `"no_sound"` after a fixed duration (default 10s, TBD during testing) — the momentary-action contract is honored, the stateful reality is hidden inside the plugin. **Presence only**, same reasoning as floodlight. |
 | Events | `POST api/getevents` (`home_id`, optionally `event_id` cursor for `geteventsuntil`-style pagination) | Returns `events_list`. Confirmed `type` values include `"person"`, `"movement"`; Presence-specific `"animal"` / `"vehicle"` types are expected but **unconfirmed** — first thing to check against Romain's real Presence events. |
 
@@ -107,24 +112,25 @@ code, by calling the Netatmo API directly.
   is a plain HTTP JPEG fetch regardless of live-view transport — only
   `camera_stream_url` / live view is blocked on a separate piece of work.
 
-**Decision on how to proceed with the Advance camera**: pending —
-see the "Open questions" / next conversation turn. Not blocking Presence
-implementation either way.
+**Decision (2026-08-04)**: v1 targets the **Presence only**. The Advance
+is deferred — revisit once (a) Netatmo resolves the discovery issue and
+(b) spec 133 gains WebRTC support for live view (or the Advance is shipped
+snapshot/monitoring-only, skipping live view — a separate small decision
+for that later iteration, not needed now).
 
 ## Goals
 
-1. Discover Romain's Presence as a Sowel device, exposing:
+1. Discover Romain's Presence — **and only the Presence, v1 scope** — as a
+   Sowel device, exposing:
    - `camera_snapshot_url`, `camera_stream_url`, `camera_monitoring` (data)
      + `set_camera_monitoring` (order).
    - `camera_light_mode` (data) + `set_camera_light_mode` (order).
    - `trigger_camera_siren` (order).
    - `camera_detection` (data), opt-in per spec 133 (not auto-bound).
-   Whether/how the Indoor Camera Advance is included in v1 is pending —
-   see "Live API test results" above. If included, it would only expose
-   `camera_snapshot_url` + `camera_monitoring` + `camera_detection` (no
-   `camera_stream_url` — WebRTC not supported by spec 133's proxy yet —
-   and no `camera_light_mode`/siren, which are Presence-specific hardware
-   anyway).
+   The Indoor Camera Advance is explicitly out of scope for v1 (see
+   Non-Goals) — the plugin's device-type mapping only needs to handle
+   `NOC` for now, but should be written so adding `NPC` later (a future
+   spec) is additive, not a rewrite.
 2. A single poll loop (default interval TBD during testing, starting
    conservative — Netatmo enforces per-app rate limits) that:
    - Calls `homestatus` for state, resolves `local_url` via `ping` (cache
@@ -146,15 +152,16 @@ implementation either way.
 - Doorbell (`NDB`) support — not owned, and it uses WebRTC instead of HLS
   (different code path entirely, same category of gap as the Advance's
   live view — see below). Future work if Romain gets one.
-- **Indoor Camera Advance (`NPC`) live view** — blocked on spec 133 not
-  supporting WebRTC signaling. Snapshot/monitoring/detection for the
-  Advance are still plausible for v1 (transport-agnostic), pending the
-  discovery issue also being resolved (see "Live API test results").
+- **Indoor Camera Advance (`NPC`) — entirely out of scope for v1**,
+  decided 2026-08-04. Two independent blockers: not discoverable via the
+  API today (external Netatmo-side issue) and its live view needs WebRTC,
+  unsupported by spec 133's proxy. Future iteration once at least the
+  discovery issue is resolved.
 - Netatmo webhooks — dev VM has no public exposure. Revisit only if that
   changes.
-- Facial recognition / named-person identification (Advance-specific,
-  it also has this like Welcome did) — out of scope, matches spec 133's
-  non-goals.
+- Facial recognition / named-person identification — moot for v1 (the
+  Presence doesn't have it; it's an Advance/Welcome feature), and out of
+  scope regardless per spec 133's own non-goals.
 - Any UI work — spec 133 already ships the full `camera` equipment type UI;
   this plugin only has to emit correctly-typed device data/orders.
 - Modifying spec 133's core contract. If live testing surfaces a mismatch
@@ -176,7 +183,7 @@ there).
 - [ ] Plugin authenticates against Netatmo using `client_id` +
       `refresh_token`, matching `legrand_energy`'s proven bridge pattern.
 - [ ] `homesdata` discovery creates a Sowel device for the Presence,
-      correctly typed. (Advance: pending scope decision.)
+      correctly typed. (Advance out of scope for v1 — see Non-Goals.)
 - [ ] Poll loop updates `camera_snapshot_url` / `camera_stream_url` with a
       currently-fetchable URL (verified by actually hitting spec 133's
       `GET /api/v1/equipments/:id/camera/snapshot` through Sowel and getting
@@ -206,9 +213,9 @@ VM. Split:
 - **Unit-testable (vitest, this repo)**: event de-duplication logic
   (given a list of previously-seen event ids + a new `events_list`, return
   only the genuinely new ones), device-type → capability mapping (`NOC` →
-  full capability set; `NPC` → snapshot/monitoring/detection only, if
-  included at all), and the siren sound→no_sound auto-revert timer logic.
-  Pure functions, no network.
+  full capability set — the only type handled in v1, but written so a
+  future `NPC` case is additive), and the siren sound→no_sound auto-revert
+  timer logic. Pure functions, no network.
 - **Live-only**: everything touching the actual Netatmo API — auth,
   discovery, snapshot/stream URL correctness, order dispatch, event
   polling. Verified directly against Romain's account and cameras on the
@@ -218,15 +225,8 @@ VM. Split:
 
 ## Open questions
 
-**Blocking, needs Romain's decision:**
-
-- What to do about the Indoor Camera Advance: (a) ship v1 with Presence
-  only, revisit the Advance later once its `homesdata` discoverability
-  issue is resolved Netatmo-side (and possibly once spec 133 gains WebRTC
-  support for its live view), or (b) something else. See "Live API test
-  results" above for the full picture.
-
-**Non-blocking, to resolve during remaining Phase 1.3/1.4 live testing:**
+To resolve during remaining Phase 1.3/1.4 live testing (none blocking
+implementation from starting):
 
 - Exact HLS path (`/live/files/high/index.m3u8` vs `/live/index.m3u8` vs
   other) — confirm against the Presence's actual firmware.
