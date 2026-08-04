@@ -170,6 +170,15 @@ const REQUEST_TIMEOUT_MS = 15_000;
 const REFRESH_MARGIN_S = 300;
 const DEFAULT_POLL_INTERVAL_S = 60;
 const MIN_POLL_INTERVAL_S = 30;
+// Local-vs-relay URL freshness is re-checked on its own, faster cycle,
+// decoupled from the main state/events poll (spec 001, 2026-08-04 finding:
+// Romain's local network path to the camera is intermittently unreachable
+// despite being configured to stay open — a real characteristic to design
+// around, not a one-off). This re-check only pings the camera/relay
+// directly (pingLocal), it never calls the Netatmo REST API, so running it
+// well above the main poll rate doesn't add to Netatmo rate-limit
+// exposure.
+const URL_REFRESH_INTERVAL_MS = 15_000;
 
 // ============================================================
 // Device mapping
@@ -488,6 +497,7 @@ class NetatmoCameraPlugin implements IntegrationPlugin {
   private homeId = "";
   private pollIntervalMs = DEFAULT_POLL_INTERVAL_S * 1000;
   private pollInterval: ReturnType<typeof setInterval> | null = null;
+  private urlRefreshInterval: ReturnType<typeof setInterval> | null = null;
   private lastPollAt: string | null = null;
   private polling = false;
   private pollFailed = false;
@@ -498,6 +508,10 @@ class NetatmoCameraPlugin implements IntegrationPlugin {
   // Camera tracking: sourceDeviceId (friendly name used with deviceManager) -> Netatmo module id + home id
   private cameraModuleIds = new Map<string, string>();
   private seenEventIds = new Map<string, Set<string>>(); // per camera module id
+  // vpn_url per module id, captured on each full poll — lets the faster
+  // URL-refresh cycle re-check local reachability without calling
+  // homestatus again.
+  private cameraVpnUrls = new Map<string, string>();
 
   constructor(deps: PluginDeps) {
     this.logger = deps.logger;
@@ -588,6 +602,7 @@ class NetatmoCameraPlugin implements IntegrationPlugin {
       const offset = options?.pollOffset ?? 0;
       const startInterval = () => {
         this.pollInterval = setInterval(() => this.safePoll(), this.pollIntervalMs);
+        this.urlRefreshInterval = setInterval(() => this.safeRefreshUrls(), URL_REFRESH_INTERVAL_MS);
       };
       if (offset > 0) {
         setTimeout(startInterval, offset);
@@ -724,6 +739,7 @@ class NetatmoCameraPlugin implements IntegrationPlugin {
       if (mod.floodlight !== undefined) payload.light_mode = mod.floodlight;
 
       if (mod.vpn_url) {
+        this.cameraVpnUrls.set(mod.id, mod.vpn_url);
         const localUrl = await this.bridge!.pingLocal(mod.vpn_url);
         const base = localUrl ?? mod.vpn_url;
         payload.snapshot_url = `${base}/live/snapshot_720.jpg`;
@@ -798,6 +814,35 @@ class NetatmoCameraPlugin implements IntegrationPlugin {
     if (this.pollInterval) {
       clearInterval(this.pollInterval);
       this.pollInterval = null;
+    }
+    if (this.urlRefreshInterval) {
+      clearInterval(this.urlRefreshInterval);
+      this.urlRefreshInterval = null;
+    }
+  }
+
+  private safeRefreshUrls(): void {
+    this.refreshLocalUrls().catch((err) =>
+      this.logger.warn({ err } as Record<string, unknown>, "URL refresh failed"),
+    );
+  }
+
+  /** Re-checks local reachability for each known camera and updates
+   * camera_snapshot_url/camera_stream_url if the resolved base changed —
+   * runs on its own faster cycle (URL_REFRESH_INTERVAL_MS), independent
+   * of the main poll. Only pings the camera/relay directly, no Netatmo
+   * REST API calls, so this is cheap to run often. */
+  private async refreshLocalUrls(): Promise<void> {
+    if (!this.bridge) return;
+    for (const [friendlyName, moduleId] of this.cameraModuleIds) {
+      const vpnUrl = this.cameraVpnUrls.get(moduleId);
+      if (!vpnUrl) continue;
+      const localUrl = await this.bridge.pingLocal(vpnUrl);
+      const base = localUrl ?? vpnUrl;
+      this.deviceManager.updateDeviceData(INTEGRATION_ID, friendlyName, {
+        snapshot_url: `${base}/live/snapshot_720.jpg`,
+        stream_url: `${base}/live/files/high/index.m3u8`,
+      });
     }
   }
 
