@@ -1,6 +1,6 @@
 {
   "name": "sowel-plugin-netatmo-camera",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Sowel plugin: Netatmo Security cameras (Presence)",
   "type": "module",
   "main": "dist/index.js",

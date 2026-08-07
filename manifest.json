@@ -2,12 +2,12 @@
   "id": "netatmo_camera",
   "type": "integration",
   "name": "Netatmo Camera",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Netatmo Security cameras (Presence) — snapshot, live view, monitoring, spot light, detections",
   "icon": "Camera",
   "repo": "alpitux/sowel-plugin-netatmo-camera",
   "author": "alpitux",
-  "sowelVersion": ">=1.30.0",
+  "sowelVersion": ">=1.31.0",
   "settings": [
     {
       "key": "client_id",
