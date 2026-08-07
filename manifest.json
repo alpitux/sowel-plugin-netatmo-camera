@@ -1,0 +1,42 @@
+{
+  "id": "netatmo_camera",
+  "type": "integration",
+  "name": "Netatmo Camera",
+  "version": "0.1.0",
+  "description": "Netatmo Security cameras (Presence) — snapshot, live view, monitoring, spot light, detections",
+  "icon": "Camera",
+  "repo": "alpitux/sowel-plugin-netatmo-camera",
+  "author": "alpitux",
+  "sowelVersion": ">=1.30.0",
+  "settings": [
+    {
+      "key": "client_id",
+      "label": "Client ID",
+      "type": "text",
+      "required": true,
+      "placeholder": "From dev.netatmo.com"
+    },
+    {
+      "key": "client_secret",
+      "label": "Client Secret",
+      "type": "password",
+      "required": true
+    },
+    {
+      "key": "refresh_token",
+      "label": "Refresh Token",
+      "type": "password",
+      "required": true,
+      "placeholder": "From Netatmo Token Generator"
+    },
+    {
+      "key": "polling_interval",
+      "label": "Polling interval (seconds)",
+      "type": "number",
+      "required": false,
+      "defaultValue": "60",
+      "placeholder": "Min 30, default 60"
+    }
+  ],
+  "apiVersion": 2
+}
