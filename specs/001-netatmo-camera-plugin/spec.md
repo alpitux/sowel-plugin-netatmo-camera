@@ -135,6 +135,42 @@ is deferred — revisit once (a) Netatmo resolves the discovery issue and
 snapshot/monitoring-only, skipping live view — a separate small decision
 for that later iteration, not needed now).
 
+**Re-tested 2026-08-20 — still not discoverable, root cause still
+unconfirmed:**
+
+- Re-ran the same unfiltered `homesdata` query directly against the dev
+  VM's live plugin credentials (token refreshed live, never leaving the
+  VM). Result: 17 modules returned for the home, correctly covering every
+  other Netatmo/Legrand/Bubendorff device Romain owns (shutters, energy
+  meters, EV charger) plus exactly **one** camera — the Presence (`NOC`).
+  No `NPC` module anywhere in the response. Same outcome as the original
+  2026-08-04 test, two weeks later.
+- Investigated a specific lead: an unconfirmed rumor of a distinct
+  `"camera pro"` OAuth scope potentially gating newer camera models.
+  **Ruled out** — Romain checked Netatmo's own token generator UI directly
+  and no such scope exists there. Not the explanation.
+- While researching, found a closer real-world parallel than the one
+  already cited above:
+  [home-assistant/core#140629](https://github.com/home-assistant/core/issues/140629) —
+  a user with the exact same symptom (Advance camera invisible to the
+  integration, older equipment fine) who **contacted Netatmo support
+  directly**; Netatmo's reply was that *"their API is OK for new
+  equipment."* That statement actually cuts against the "known Netatmo-side
+  bug, nothing to do about it" framing this spec had settled on — if
+  Netatmo's own support believes the API works, the gap might be
+  account-specific or app-registration-specific rather than a blanket
+  platform bug, but this is not confirmed either way. The linked HA issue
+  itself remains open/unresolved, with no diagnostic conclusion from
+  either side.
+- **Net effect on the decision above: none.** Still not discoverable,
+  still deferred, still Presence-only for v1. The only change is that
+  "known Netatmo-side bug" should be read as "unresolved, cause not
+  definitively pinned down" rather than a settled fact. The one concrete
+  avenue that has produced an actual answer for anyone so far is
+  contacting Netatmo support directly with the account's own case — not
+  yet done for Romain's account, would be the next step if this is
+  revisited.
+
 ## Goals
 
 1. Discover Romain's Presence — **and only the Presence, v1 scope** — as a
