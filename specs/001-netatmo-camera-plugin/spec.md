@@ -162,14 +162,40 @@ unconfirmed:**
   platform bug, but this is not confirmed either way. The linked HA issue
   itself remains open/unresolved, with no diagnostic conclusion from
   either side.
-- **Net effect on the decision above: none.** Still not discoverable,
-  still deferred, still Presence-only for v1. The only change is that
-  "known Netatmo-side bug" should be read as "unresolved, cause not
-  definitively pinned down" rather than a settled fact. The one concrete
-  avenue that has produced an actual answer for anyone so far is
-  contacting Netatmo support directly with the account's own case — not
-  yet done for Romain's account, would be the next step if this is
-  revisited.
+**Same-day follow-up (2026-08-20) — scope hypothesis conclusively ruled
+out:**
+
+- A contact of Romain's suggested two specific scope names allegedly
+  gating newer-generation cameras: `cameraextnoc2` (plausible — Netatmo
+  does sell a real `NOC2` outdoor camera line, a newer generation distinct
+  from the original `NOC`/Presence, confirmed via product listings) and
+  `cameraextnpc` (by analogy, for the `NPC`/Indoor Camera Advance itself).
+- Romain regenerated a token from Netatmo's own token generator with
+  **every scope currently offered by the UI enabled** (24 scopes granted:
+  `read_station`, `read_magellan`, `write_magellan`, `read_bubendorff`,
+  `write_bubendorff`, `read_smarther`, `write_smarther`,
+  `read_thermostat`, `write_thermostat`, `read_camera`, `write_camera`,
+  `access_camera`, `read_doorbell`, `access_doorbell`, `read_mx`,
+  `write_mx`, `read_presence`, `write_presence`, `access_presence`,
+  `read_homecoach`, `read_carbonmonoxidedetector`, `read_smokedetector`,
+  `read_mhs1`, `write_mhs1` — confirmed via the token response's own
+  `scope` field, not assumed).
+- Neither `cameraextnoc2` nor `cameraextnpc` appears anywhere in that
+  granted-scope list — they either don't exist as real Netatmo scopes, or
+  aren't offered for this app/account. **Ruled out**, same as `"camera
+  pro"` above.
+- Re-ran `homesdata` with this maximal-scope token: **identical result** —
+  17 modules, exactly one camera (`NOC`), still no `NPC`.
+- **This is the strongest evidence yet that scope/permissions are not the
+  cause.** With literally every available scope granted, discovery
+  behavior didn't change at all. Whatever gates the Advance from
+  `homesdata`, it isn't something fixable from the OAuth app
+  configuration side — reinforces that if this is pursued further, the
+  next step is contacting Netatmo support directly about this specific
+  account/device (see previous entry), not more scope experimentation.
+
+**Net effect on the decision above: none.** Still not discoverable, still
+deferred, still Presence-only for v1.
 
 ## Goals
 
