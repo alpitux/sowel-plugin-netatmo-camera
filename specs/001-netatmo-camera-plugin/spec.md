@@ -201,8 +201,11 @@ deferred, still Presence-only for v1.
 symptom; every remaining client-side hypothesis exhausted:**
 
 - Romain installed a new physical camera, marketed as **"Outdoor
-  Original"** — a distinct unit from his existing Presence
-  ("Caméra Portail Cour", `NOC`), not a duplicate. Confirmed by Romain:
+  Original"** — confirmed by Romain to be the **`NOC2`** (the newer-gen
+  outdoor camera line referenced in the 2026-08-20 `cameraextnoc2` scope
+  investigation above, which at that point was still hypothetical —
+  Romain didn't own one yet). A distinct unit from his existing Presence
+  (`NOC`, "Caméra Portail Cour"), not a duplicate. Confirmed by Romain:
   visible and functional in the Netatmo Security mobile app, under the
   same single home ("Maison") as everything else on the account.
 - `homesdata` re-tested immediately after: **still 17 modules, still
@@ -236,6 +239,20 @@ symptom; every remaining client-side hypothesis exhausted:**
   actually produced a real (if inconclusive) answer for another affected
   user in the wild (see `home-assistant/core#140629` above). Nothing left
   to usefully test from the plugin/API-client side alone.
+- **Closes the `cameraextnoc2` question from 2026-08-20 for good**: that
+  was tested against a hypothetical `NOC2` at the time (Romain didn't own
+  one yet). Now that a real `NOC2` is installed and still invisible
+  regardless of scope, token freshness, or re-authorization, there's no
+  scenario left where a scope tweak would have helped — the device itself
+  doesn't reach `homesdata` at all, for any reason discoverable from this
+  side.
+- **v1 scope note**: this doesn't change anything about the current
+  plugin's shipped scope (Presence-only) — the `NOC2` was never in scope
+  for v1 either way. But if Netatmo ever resolves this discovery gap, the
+  `NOC2` becomes a live candidate for a real v2 alongside the Advance,
+  and — unlike the Advance — is expected to use the same HLS-based live
+  view as the Presence (not WebRTC), which would make it the cheaper of
+  the two to actually add once/if it becomes discoverable.
 
 ## Goals
 
