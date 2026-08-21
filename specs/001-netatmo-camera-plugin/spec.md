@@ -197,6 +197,46 @@ out:**
 **Net effect on the decision above: none.** Still not discoverable, still
 deferred, still Presence-only for v1.
 
+**2026-08-21 — a second, different camera model reproduces the exact same
+symptom; every remaining client-side hypothesis exhausted:**
+
+- Romain installed a new physical camera, marketed as **"Outdoor
+  Original"** — a distinct unit from his existing Presence
+  ("Caméra Portail Cour", `NOC`), not a duplicate. Confirmed by Romain:
+  visible and functional in the Netatmo Security mobile app, under the
+  same single home ("Maison") as everything else on the account.
+- `homesdata` re-tested immediately after: **still 17 modules, still
+  exactly one camera (`NOC`)**. The new device does not appear, exact same
+  symptom as the `NPC`/Advance case above — down to the same
+  visible-in-app-but-absent-from-API pattern.
+- Three more explanations tested and ruled out, in order:
+  1. **Stale token** — re-tested with a plain refresh. No change.
+  2. **Stale OAuth consent snapshot** (theory: Netatmo might fix the set
+     of visible devices at authorization time rather than recomputing it
+     per request, so a device added after authorizing the app wouldn't
+     show up until re-consenting) — Romain performed a **full fresh
+     re-authorization** (not just a token refresh) through Netatmo's
+     token generator, done *after* confirming the new camera's install.
+     No change — still absent.
+  3. **Multiple homes** (theory: the new camera could have landed in a
+     second, separate "home" entity that a single-home-assumption query
+     might miss) — Romain confirmed via the app that his account has
+     **exactly one home**. Not applicable.
+- **This meaningfully strengthens the "real Netatmo-side platform issue"
+  theory.** It's no longer one anomalous device (the Advance, a
+  relatively new and unusual product) — it's now **two unrelated camera
+  models**, installed independently, both reproducing the identical
+  gap between the mobile app's view of the account and what the public
+  API returns. Every hypothesis fixable from this project's side (scope,
+  token freshness, consent staleness, home selection) has been tested and
+  ruled out.
+- **Recommendation, unchanged in substance but now better justified**:
+  the next productive step, if this is pursued further, is contacting
+  Netatmo support directly about the account — the one thing that's
+  actually produced a real (if inconclusive) answer for another affected
+  user in the wild (see `home-assistant/core#140629` above). Nothing left
+  to usefully test from the plugin/API-client side alone.
+
 ## Goals
 
 1. Discover Romain's Presence — **and only the Presence, v1 scope** — as a
