@@ -149,6 +149,36 @@ unconfirmed:**
   `"camera pro"` OAuth scope potentially gating newer camera models.
   **Ruled out** — Romain checked Netatmo's own token generator UI directly
   and no such scope exists there. Not the explanation.
+- **Full scope inventory, for reference when contacting Netatmo support**
+  (concrete material to cite, not a guess): Romain selected **every scope
+  currently offered by Netatmo's token generator UI** and generated a
+  token against them. Confirmed twice — once on 2026-08-20, again on
+  2026-08-21 after installing the `NOC2` (see below) — via the OAuth
+  token response's own `scope` field, not assumed. Both times, the exact
+  same 24 scopes, no more, no less:
+
+  ```
+  read_station
+  read_magellan          write_magellan
+  read_bubendorff        write_bubendorff
+  read_smarther          write_smarther
+  read_thermostat        write_thermostat
+  read_camera            write_camera        access_camera
+  read_doorbell                              access_doorbell
+  read_presence          write_presence      access_presence
+  read_mx                write_mx
+  read_homecoach
+  read_carbonmonoxidedetector
+  read_smokedetector
+  read_mhs1              write_mhs1
+  ```
+
+  Neither `"camera pro"`, `cameraextnoc2`, nor `cameraextnpc` (see below)
+  is among them — **this is the complete, exhaustive set of scopes this
+  Netatmo developer account/app can currently request, full stop.** If
+  Netatmo support asks "what scopes do you have," this list is the
+  accurate, verified answer — not an assumption from third-party docs
+  like the rest of this spec's API research.
 - While researching, found a closer real-world parallel than the one
   already cited above:
   [home-assistant/core#140629](https://github.com/home-assistant/core/issues/140629) —
